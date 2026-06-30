@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Session Log</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14161A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Session Log">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg: #14161A;
+    --surface: #1D2025;
+    --surface-2: #262A31;
+    --line: #33373F;
+    --text: #ECEDEE;
+    --text-dim: #9398A1;
+    --accent: #C8FF4D;
+    --accent-dim: #8FB838;
+    --danger: #FF6B5E;
+    --radius: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text); height:100%;}
+  body{padding-bottom:40px;}
+  .mono{font-family: ui-monospace, "SF Mono", "Roboto Mono", Menlo, monospace;}
+
+  header{
+    padding: 22px 18px 14px;
+    position: sticky; top:0; z-index:20;
+    background: linear-gradient(180deg, var(--bg) 70%, transparent);
+  }
+  .eyebrow{
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; margin-bottom: 4px;
+  }
+  h1{
+    margin:0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;
+    text-transform: uppercase;
+  }
+  .sub{color:var(--text-dim); font-size:13px; margin-top:4px;}
+
+  .tabs{
+    display:flex; gap:8px; padding: 10px 18px 4px; overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{
+    flex: 0 0 auto;
+    padding: 9px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 13px; font-weight: 700; letter-spacing:0.3px;
+    cursor:pointer; white-space:nowrap;
+    transition: all .15s ease;
+  }
+  .tab.active{
+    background: var(--accent); color: #14161A; border-color: var(--accent);
+  }
+
+  main{padding: 10px 18px 0;}
+
+  .day-meta{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin: 14px 0 10px;
+  }
+  .day-meta .name{font-size:18px; font-weight:800;}
+  .day-meta .est{color:var(--text-dim); font-size:12px;}
+
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .card-head{
+    padding: 14px 16px 10px;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    cursor:pointer;
+  }
+  .ex-name{font-weight:700; font-size:15px;}
+  .ex-target{color:var(--text-dim); font-size:12px; margin-top:2px;}
+  .chev{color:var(--text-dim); font-size:13px; transition: transform .15s ease;}
+  .card.open .chev{transform: rotate(180deg);}
+
+  .suggest{
+    margin: 0 16px 10px; padding: 8px 10px;
+    background: rgba(200,255,77,0.08);
+    border: 1px solid rgba(200,255,77,0.25);
+    border-radius: 8px;
+    font-size: 12px; color: var(--accent);
+    display:none;
+  }
+  .suggest.show{display:block;}
+
+  .sets{padding: 0 16px 14px; display:none;}
+  .card.open .sets{display:block;}
+  .set-row{
+    display:grid; grid-template-columns: 28px 1fr 1fr 30px;
+    gap:8px; align-items:center; margin-bottom:8px;
+  }
+  .set-num{color:var(--text-dim); font-size:12px; text-align:center;}
+  .set-row input{
+    width:100%; background: var(--surface-2); border:1px solid var(--line);
+    border-radius:8px; color:var(--text); padding:9px 8px; font-size:14px;
+    text-align:center;
+  }
+  .set-row input::placeholder{color:#5A5F68;}
+  .set-check{
+    width:30px; height:30px; border-radius:8px; border:1px solid var(--line);
+    background: var(--surface-2); color:var(--text-dim);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:14px;
+  }
+  .set-check.done{background:var(--accent); color:#14161A; border-color:var(--accent);}
+
+  .last-time{font-size:11px; color:var(--text-dim); margin: -2px 0 8px;}
+
+  .finisher-label{
+    font-size:11px; text-transform:uppercase; letter-spacing:1.5px;
+    color: var(--text-dim); margin: 18px 0 6px 2px; font-weight:700;
+  }
+
+  .save-bar{
+    position: sticky; bottom:0; padding: 14px 18px 18px;
+    background: linear-gradient(0deg, var(--bg) 60%, transparent);
+  }
+  .save-btn{
+    width:100%; padding:14px; border-radius:12px; border:none;
+    background: var(--accent); color:#14161A; font-weight:800;
+    font-size:14px; text-transform:uppercase; letter-spacing:1px;
+    cursor:pointer;
+  }
+  .save-btn:active{transform: scale(0.98);}
+  .save-msg{
+    text-align:center; font-size:12px; color:var(--accent); margin-top:8px; min-height:14px;
+  }
+
+  .bw-card{
+    background: var(--surface); border:1px solid var(--line); border-radius: var(--radius);
+    padding:14px 16px; margin: 4px 0 14px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .bw-card .label{font-size:13px; font-weight:700;}
+  .bw-card .label .d{display:block; color:var(--text-dim); font-weight:400; font-size:11px; margin-top:2px;}
+  .bw-input-wrap{display:flex; align-items:center; gap:6px;}
+  .bw-input-wrap input{
+    width:70px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px;
+    color:var(--text); padding:8px; font-size:14px; text-align:center;
+  }
+  .bw-unit{color:var(--text-dim); font-size:12px;}
+
+  .hist-toggle{
+    text-align:center; padding: 16px 0 4px; color: var(--text-dim); font-size:12px;
+    cursor:pointer; text-decoration: underline;
+  }
+  .hist-list{padding: 6px 18px 20px; display:none;}
+  .hist-list.show{display:block;}
+  .hist-row{
+    display:flex; justify-content:space-between; padding:8px 0;
+    border-bottom:1px solid var(--line); font-size:12px;
+  }
+  .hist-row .date{color:var(--text-dim);}
+  .hist-row .vals{color:var(--text);}
+
+  .loading{padding: 40px 18px; text-align:center; color:var(--text-dim); font-size:13px;}
+
+  .cal-section{padding: 4px 18px 20px;}
+  .cal-head{
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;
+  }
+  .cal-head .title{font-size:13px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:1.5px;}
+  .cal-nav{display:flex; gap:6px;}
+  .cal-nav-btn{
+    width:28px; height:28px; border-radius:8px; border:1px solid var(--line);
+    background:var(--surface); color:var(--text); display:flex; align-items:center;
+    justify-content:center; cursor:pointer; font-size:13px;
+  }
+  .cal-month-label{font-size:12px; color:var(--text-dim); margin-bottom:8px; text-align:center; font-weight:700;}
+  .cal-grid{
+    display:grid; grid-template-columns: repeat(7, 1fr); gap:6px;
+    background: var(--surface); border:1px solid var(--line); border-radius: var(--radius);
+    padding:12px;
+  }
+  .cal-dow{font-size:10px; color:var(--text-dim); text-align:center; padding-bottom:4px;}
+  .cal-day{
+    aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border-radius:8px; font-size:12px; color:var(--text-dim); cursor:default; position:relative;
+  }
+  .cal-day.has-log{background: var(--surface-2); color:var(--text); cursor:pointer; font-weight:700;}
+  .cal-day.has-log:active{transform:scale(0.95);}
+  .cal-day.selected{background: var(--accent); color:#14161A;}
+  .cal-day .dot{width:4px; height:4px; border-radius:50%; background:var(--accent); margin-top:2px;}
+  .cal-day.selected .dot{background:#14161A;}
+  .cal-day.empty{visibility:hidden;}
+
+  .day-detail{
+    margin-top:12px; background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--radius); padding:14px 16px; display:none;
+  }
+  .day-detail.show{display:block;}
+  .day-detail .dd-title{font-weight:800; font-size:14px; margin-bottom:2px;}
+  .day-detail .dd-date{color:var(--text-dim); font-size:11px; margin-bottom:10px;}
+  .dd-ex{margin-bottom:10px;}
+  .dd-ex-name{font-size:13px; font-weight:700; margin-bottom:3px;}
+  .dd-ex-sets{font-size:12px; color:var(--text-dim);}
+  .dd-empty{color:var(--text-dim); font-size:12px; text-align:center; padding:8px 0;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Session Log</div>
+  <h1>4-Day Split</h1>
+  <div class="sub" id="todayLine"></div>
+</header>
+
+<div class="tabs" id="tabs"></div>
+
+<main>
+  <div class="day-meta">
+    <div class="name" id="dayName"></div>
+    <div class="est" id="dayEst"></div>
+  </div>
+  <div id="exerciseList"></div>
+</main>
+
+<div class="save-bar">
+  <button class="save-btn" id="saveBtn">Save Session</button>
+  <div class="save-msg" id="saveMsg"></div>
+</div>
+
+<div class="hist-toggle" id="bwToggleWrap">— Bodyweight Log —</div>
+<div class="bw-card" style="margin:0 18px 14px;">
+  <div class="label">Today's weight<span class="d" id="bwLast">no entries yet</span></div>
+  <div class="bw-input-wrap">
+    <input type="number" id="bwInput" placeholder="—" inputmode="decimal">
+    <span class="bw-unit">lb</span>
+    <button class="set-check" id="bwSave" style="width:36px;height:36px;">✓</button>
+  </div>
+</div>
+
+<div class="cal-section">
+  <div class="cal-head">
+    <div class="title">Session Calendar</div>
+    <div class="cal-nav">
+      <div class="cal-nav-btn" id="calPrev">‹</div>
+      <div class="cal-nav-btn" id="calNext">›</div>
+    </div>
+  </div>
+  <div class="cal-month-label" id="calMonthLabel"></div>
+  <div class="cal-grid" id="calGrid"></div>
+  <div class="day-detail" id="dayDetail"></div>
+</div>
+
+<script>
+// Local storage adapter — mirrors the get/set/delete/list interface,
+// but persists permanently in this browser (no account or session needed).
+window.storage = {
+  get: async (key) => {
+    const v = localStorage.getItem(key);
+    if (v === null) throw new Error('not found');
+    return { key, value: v };
+  },
+  set: async (key, value) => {
+    localStorage.setItem(key, value);
+    return { key, value };
+  },
+  delete: async (key) => {
+    localStorage.removeItem(key);
+    return { key, deleted: true };
+  },
+  list: async (prefix) => {
+    const keys = Object.keys(localStorage).filter(k => !prefix || k.startsWith(prefix));
+    return { keys, prefix };
+  }
+};
+
+const PLAN = {
+  d1: { name: "Lower A", est: "~38 min", finisherFrom: 5,
+    exercises: [
+      { id: "d1_goblet_squat", name: "Goblet Squat", target: "4 x 6–8" },
+      { id: "d1_leg_press", name: "Leg Press", target: "3 x 8–10" },
+      { id: "d1_leg_curl", name: "Leg Curl (machine)", target: "3 x 8–10" },
+      { id: "d1_rdl", name: "RDL (DB)", target: "3 x 8–10" },
+      { id: "d1_hip_thrust", name: "Hip Thrust", target: "3 x 8–10" },
+      { id: "d1_calf_raise", name: "Calf Raise (machine)", target: "3 x 10–12", finisher:true },
+      { id: "d1_abs", name: "Ab Circuit (2 rounds)", target: "Plank / Cable Crunch / Sit-up", finisher:true, noWeight:true },
+    ]},
+  d2: { name: "Upper A", est: "~36 min",
+    exercises: [
+      { id: "d2_bench", name: "Bench Press (flat)", target: "4 x 6–8" },
+      { id: "d2_pulldown", name: "Lat Pulldown", target: "4 x 6–8" },
+      { id: "d2_db_shoulder_press", name: "DB Shoulder Press", target: "3 x 8–10" },
+      { id: "d2_cs_row", name: "Chest-Supported Row", target: "3 x 8–10" },
+      { id: "d2_cable_curl", name: "Cable Curl", target: "2 x 8–10" },
+      { id: "d2_cable_tricep", name: "Cable Tricep Extension", target: "2 x 8–10" },
+    ]},
+  d3: { name: "Lower B", est: "~38 min",
+    exercises: [
+      { id: "d3_rfe_split_squat", name: "RFE Split Squat (DB)", target: "3 x 6–8 /leg" },
+      { id: "d3_hack_squat", name: "Hack Squat / Leg Press", target: "3 x 8–10" },
+      { id: "d3_leg_curl", name: "Leg Curl (machine)", target: "3 x 8–10" },
+      { id: "d3_back_ext", name: "Back Extension (Hyper)", target: "3 x 8–10" },
+      { id: "d3_glute_kickback", name: "Cable Glute Kickback", target: "2 x 10–12 /leg" },
+      { id: "d3_calf_raise", name: "Calf Raise (machine)", target: "3 x 10–12", finisher:true },
+      { id: "d3_abs", name: "Ab Circuit (2 rounds)", target: "Side Plank / Hanging Raise / Rotation", finisher:true, noWeight:true },
+    ]},
+  d4: { name: "Upper B", est: "~36 min",
+    exercises: [
+      { id: "d4_incline", name: "Incline Bench (DB/machine)", target: "4 x 6–8" },
+      { id: "d4_seated_row", name: "Seated Cable Row", target: "4 x 6–8" },
+      { id: "d4_delt_raise", name: "3-Way Delt Raise", target: "3 x 8–10 /ea" },
+      { id: "d4_db_curl", name: "DB Curl", target: "2 x 8–10" },
+      { id: "d4_oh_tricep", name: "Overhead Tricep Extension", target: "2 x 8–10" },
+    ]},
+};
+const DAY_ORDER = ["d1","d2","d3","d4"];
+const SETS_PER_EXERCISE = { default: 3 };
+function setCountFor(target){
+  const m = target.match(/^(\d+)\s*x/i);
+  return m ? parseInt(m[1]) : 3;
+}
+function repRangeTop(target){
+  const m = target.match(/(\d+)\s*[–-]\s*(\d+)/);
+  return m ? parseInt(m[2]) : null;
+}
+
+let activeDay = "d1";
+let lastSessions = {}; // exerciseId -> {date, sets:[{weight,reps}]}
+
+const todayLine = document.getElementById('todayLine');
+todayLine.textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+
+function buildTabs(){
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = '';
+  DAY_ORDER.forEach(key=>{
+    const b = document.createElement('div');
+    b.className = 'tab' + (key===activeDay ? ' active' : '');
+    b.textContent = PLAN[key].name;
+    b.onclick = ()=>{ activeDay = key; render(); };
+    tabs.appendChild(b);
+  });
+}
+
+async function loadLastSession(exId){
+  try{
+    const res = await window.storage.get('last:'+exId, false);
+    if(res && res.value) return JSON.parse(res.value);
+  }catch(e){}
+  return null;
+}
+
+async function renderExercise(ex){
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'card_'+ex.id;
+
+  const head = document.createElement('div');
+  head.className = 'card-head';
+  head.innerHTML = `
+    <div>
+      <div class="ex-name">${ex.name}</div>
+      <div class="ex-target">${ex.target}</div>
+    </div>
+    <div class="chev">▾</div>`;
+  head.onclick = ()=> card.classList.toggle('open');
+  card.appendChild(head);
+
+  const suggest = document.createElement('div');
+  suggest.className = 'suggest';
+  suggest.id = 'suggest_'+ex.id;
+  card.appendChild(suggest);
+
+  const setsWrap = document.createElement('div');
+  setsWrap.className = 'sets';
+
+  const last = await loadLastSession(ex.id);
+  lastSessions[ex.id] = last;
+
+  if(last){
+    const lastLine = document.createElement('div');
+    lastLine.className = 'last-time mono';
+    const dateStr = new Date(last.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const summary = last.sets.map(s=> ex.noWeight ? `${s.reps||'-'}r` : `${s.weight||'-'}×${s.reps||'-'}`).join('  ');
+    lastLine.textContent = `Last (${dateStr}): ${summary}`;
+    setsWrap.appendChild(lastLine);
+  }
+
+  const numSets = setCountFor(ex.target);
+  const top = repRangeTop(ex.target);
+  let hitTop = last && last.sets.length>0;
+  if(last){
+    for(const s of last.sets){
+      if(!top || !s.reps || parseInt(s.reps) < top){ hitTop = false; }
+    }
+  }
+  if(hitTop && top){
+    suggest.classList.add('show');
+    suggest.textContent = `Hit top of range last time → try +5% weight today`;
+  }
+
+  for(let i=1;i<=numSets;i++){
+    const row = document.createElement('div');
+    row.className = 'set-row';
+    const prevSet = last && last.sets[i-1] ? last.sets[i-1] : null;
+    const prevW = prevSet && prevSet.weight ? prevSet.weight : '';
+    const prevR = prevSet && prevSet.reps ? prevSet.reps : '';
+    row.innerHTML = `
+      <div class="set-num mono">${i}</div>
+      ${ex.noWeight ? '<div></div>' : `<input type="number" inputmode="decimal" class="mono w-input" placeholder="lb" value="${prevW}">`}
+      <input type="number" inputmode="numeric" class="mono r-input" placeholder="reps" value="${prevR}">
+      <div class="set-check" data-done="0">○</div>
+    `;
+    const check = row.querySelector('.set-check');
+    check.onclick = ()=>{
+      const done = check.dataset.done === '1';
+      check.dataset.done = done ? '0' : '1';
+      check.classList.toggle('done', !done);
+      check.textContent = done ? '○' : '✓';
+    };
+    setsWrap.appendChild(row);
+  }
+  card.appendChild(setsWrap);
+  return card;
+}
+
+async function render(){
+  buildTabs();
+  const day = PLAN[activeDay];
+  document.getElementById('dayName').textContent = day.name;
+  document.getElementById('dayEst').textContent = day.est;
+  const list = document.getElementById('exerciseList');
+  list.innerHTML = '<div class="loading">Loading last session data…</div>';
+
+  const frag = document.createDocumentFragment();
+  let finisherShown = false;
+  for(const ex of day.exercises){
+    if(ex.finisher && !finisherShown){
+      const label = document.createElement('div');
+      label.className = 'finisher-label';
+      label.textContent = 'Finisher';
+      frag.appendChild(label);
+      finisherShown = true;
+    }
+    const card = await renderExercise(ex);
+    frag.appendChild(card);
+  }
+  list.innerHTML = '';
+  list.appendChild(frag);
+}
+
+async function saveSession(){
+  const day = PLAN[activeDay];
+  const btn = document.getElementById('saveBtn');
+  const msg = document.getElementById('saveMsg');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  const now = new Date();
+  const date = now.toISOString();
+  const dateKey = date.slice(0,10);
+  let savedCount = 0;
+  const dayLogExercises = [];
+
+  for(const ex of day.exercises){
+    const card = document.getElementById('card_'+ex.id);
+    if(!card) continue;
+    const rows = card.querySelectorAll('.set-row');
+    const sets = [];
+    rows.forEach(row=>{
+      const wInput = row.querySelector('.w-input');
+      const rInput = row.querySelector('.r-input');
+      const weight = wInput ? wInput.value : null;
+      const reps = rInput ? rInput.value : null;
+      if(weight || reps){
+        sets.push({ weight: weight || null, reps: reps || null });
+      }
+    });
+    if(sets.length === 0) continue;
+    savedCount++;
+    const entry = { date, sets };
+    dayLogExercises.push({ id: ex.id, name: ex.name, sets });
+    try{
+      await window.storage.set('last:'+ex.id, JSON.stringify(entry), false);
+      const histRes = await window.storage.get('hist:'+ex.id, false).catch(()=>null);
+      let hist = [];
+      if(histRes && histRes.value){ try{ hist = JSON.parse(histRes.value); }catch(e){ hist = []; } }
+      hist.push(entry);
+      if(hist.length > 30) hist = hist.slice(hist.length-30);
+      await window.storage.set('hist:'+ex.id, JSON.stringify(hist), false);
+    }catch(e){
+      console.error('Storage error', e);
+    }
+  }
+
+  if(dayLogExercises.length > 0){
+    try{
+      const logEntry = { date, dayKey: activeDay, dayName: day.name, exercises: dayLogExercises };
+      await window.storage.set('log:'+dateKey, JSON.stringify(logEntry), false);
+      const idxRes = await window.storage.get('log-index', false).catch(()=>null);
+      let idx = [];
+      if(idxRes && idxRes.value){ try{ idx = JSON.parse(idxRes.value); }catch(e){ idx = []; } }
+      if(!idx.includes(dateKey)){ idx.push(dateKey); await window.storage.set('log-index', JSON.stringify(idx), false); }
+      logIndexCache = idx.includes(dateKey) ? idx : [...idx, dateKey];
+    }catch(e){ console.error('Calendar log save error', e); }
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Save Session';
+  msg.textContent = savedCount > 0 ? `Saved ${savedCount} exercise${savedCount>1?'s':''} ✓` : 'Nothing entered yet';
+  setTimeout(()=>{ msg.textContent=''; }, 2500);
+  if(savedCount>0){ render(); renderCalendar(); }
+}
+
+document.getElementById('saveBtn').onclick = saveSession;
+
+// Bodyweight log
+async function loadBW(){
+  try{
+    const res = await window.storage.get('bw:latest', false);
+    if(res && res.value){
+      const d = JSON.parse(res.value);
+      document.getElementById('bwLast').textContent =
+        `last: ${d.weight} lb · ${new Date(d.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+    }
+  }catch(e){}
+}
+document.getElementById('bwSave').onclick = async ()=>{
+  const val = document.getElementById('bwInput').value;
+  if(!val) return;
+  const entry = { weight: val, date: new Date().toISOString() };
+  try{
+    await window.storage.set('bw:latest', JSON.stringify(entry), false);
+    const histRes = await window.storage.get('bw:history', false).catch(()=>null);
+    let hist = [];
+    if(histRes && histRes.value){ try{ hist = JSON.parse(histRes.value); }catch(e){} }
+    hist.push(entry);
+    if(hist.length>60) hist = hist.slice(hist.length-60);
+    await window.storage.set('bw:history', JSON.stringify(hist), false);
+    document.getElementById('bwInput').value='';
+    loadBW();
+  }catch(e){ console.error(e); }
+};
+
+loadBW();
+render();
+
+// ---- Calendar ----
+let calViewDate = new Date();
+calViewDate.setDate(1);
+let logIndexCache = null;
+let selectedDateKey = null;
+
+async function getLogIndex(){
+  if(logIndexCache) return logIndexCache;
+  try{
+    const res = await window.storage.get('log-index', false);
+    logIndexCache = (res && res.value) ? JSON.parse(res.value) : [];
+  }catch(e){ logIndexCache = []; }
+  return logIndexCache;
+}
+
+function fmtDateKey(y,m,d){
+  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+async function renderCalendar(){
+  const idx = await getLogIndex();
+  const idxSet = new Set(idx);
+  const y = calViewDate.getFullYear();
+  const m = calViewDate.getMonth();
+  const monthLabel = calViewDate.toLocaleDateString('en-US',{month:'long', year:'numeric'});
+  document.getElementById('calMonthLabel').textContent = monthLabel;
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  ['S','M','T','W','T','F','S'].forEach(d=>{
+    const el = document.createElement('div');
+    el.className = 'cal-dow';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDow = new Date(y,m,1).getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const todayKey = new Date().toISOString().slice(0,10);
+
+  for(let i=0;i<firstDow;i++){
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const key = fmtDateKey(y,m,d);
+    const el = document.createElement('div');
+    const hasLog = idxSet.has(key);
+    el.className = 'cal-day' + (hasLog ? ' has-log' : '') + (key===selectedDateKey ? ' selected' : '') + (key===todayKey ? '' : '');
+    el.innerHTML = `<span>${d}</span>${hasLog ? '<span class="dot"></span>' : ''}`;
+    if(hasLog){
+      el.onclick = ()=> showDayDetail(key);
+    }
+    grid.appendChild(el);
+  }
+}
+
+async function showDayDetail(dateKey){
+  selectedDateKey = dateKey;
+  await renderCalendar();
+  const panel = document.getElementById('dayDetail');
+  panel.classList.add('show');
+  panel.innerHTML = '<div class="dd-empty">Loading…</div>';
+  try{
+    const res = await window.storage.get('log:'+dateKey, false);
+    if(!res || !res.value){
+      panel.innerHTML = '<div class="dd-empty">No session details found</div>';
+      return;
+    }
+    const log = JSON.parse(res.value);
+    const dateStr = new Date(log.date).toLocaleDateString('en-US',{weekday:'long', month:'short', day:'numeric'});
+    let html = `<div class="dd-title">${log.dayName}</div><div class="dd-date">${dateStr}</div>`;
+    log.exercises.forEach(ex=>{
+      const setsStr = ex.sets.map(s=> (s.weight ? `${s.weight}×${s.reps||'-'}` : `${s.reps||'-'} reps`)).join('  ·  ');
+      html += `<div class="dd-ex"><div class="dd-ex-name">${ex.name}</div><div class="dd-ex-sets mono">${setsStr}</div></div>`;
+    });
+    panel.innerHTML = html;
+  }catch(e){
+    panel.innerHTML = '<div class="dd-empty">Couldn\'t load this session</div>';
+  }
+}
+
+document.getElementById('calPrev').onclick = ()=>{
+  calViewDate.setMonth(calViewDate.getMonth()-1);
+  renderCalendar();
+};
+document.getElementById('calNext').onclick = ()=>{
+  calViewDate.setMonth(calViewDate.getMonth()+1);
+  renderCalendar();
+};
+
+renderCalendar();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+
+</script>
+</body>
+</html>
